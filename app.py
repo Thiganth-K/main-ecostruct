@@ -1,6 +1,9 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 from utils import grade_data, spec_data, resolve_ecf, calculate_transport_factor, calculate_waste_factor
 import math
+import pdfkit
+import tempfile
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -102,6 +105,51 @@ def calculate_waste():
             2
         )
     })
+
+@app.route('/concrete/compare', methods=['POST'])
+def compare_columns():
+    data = request.get_json()
+    columns = data['columns']
+    
+    # Calculate efficiency scores
+    min_carbon = min(col['total_carbon'] for col in columns)
+    for col in columns:
+        col['efficiency_score'] = (min_carbon / col['total_carbon']) * 100
+    
+    # Find most and least efficient
+    most_efficient = max(columns, key=lambda x: x['efficiency_score'])
+    least_efficient = min(columns, key=lambda x: x['efficiency_score'])
+    
+    return jsonify({
+        'columns': columns,
+        'most_efficient_index': columns.index(most_efficient),
+        'least_efficient_index': columns.index(least_efficient)
+    })
+
+@app.route('/concrete/export-pdf', methods=['POST'])
+def export_pdf():
+    data = request.get_json()
+    
+    # Generate HTML content
+    html_content = render_template(
+        'pdf_template.html',
+        columns=data['columns'],
+        date=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
+    
+    # Configure PDF options
+    options = {
+        'page-size': 'A4',
+        'margin-top': '0.75in',
+        'margin-right': '0.75in',
+        'margin-bottom': '0.75in',
+        'margin-left': '0.75in',
+    }
+    
+    # Create temporary file
+    with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as f:
+        pdfkit.from_string(html_content, f.name, options=options)
+        return send_file(f.name, as_attachment=True, download_name='ecostruct_report.pdf')
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0", port=9000)

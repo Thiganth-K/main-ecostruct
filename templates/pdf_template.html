@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: Arial, sans-serif; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .column-section { margin-bottom: 30px; }
+        .data-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        .data-table th, .data-table td { 
+            border: 1px solid #ddd; 
+            padding: 8px; 
+            text-align: left; 
+        }
+        .data-table th { background-color: #f5f5f5; }
+        .efficiency-score { 
+            font-weight: bold; 
+            color: #28a745; 
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>EcoStruct Report</h1>
+        <p>Generated on {{ date }}</p>
+    </div>
+
+    {% for column in columns %}
+    <div class="column-section">
+        <h2>Column Type {{ loop.index }}</h2>
+        <table class="data-table">
+            <tr>
+                <th colspan="2">Dimensions and Properties</th>
+            </tr>
+            <tr>
+                <td>Length × Breadth × Depth</td>
+                <td>{{ column.length }}m × {{ column.breadth }}m × {{ column.depth }}m</td>
+            </tr>
+            <tr>
+                <td>Number of Columns</td>
+                <td>{{ column.numColumns }}</td>
+            </tr>
+            <tr>
+                <td>Steel Properties</td>
+                <td>{{ column.numBars }} bars, {{ column.steelDiameter }}mm diameter, {{ column.steelLength }}m length</td>
+            </tr>
+            <tr>
+                <td>Grade & Specification</td>
+                <td>{{ column.grade }} - {{ column.specification }}</td>
+            </tr>
+        </table>
+
+        <table class="data-table">
+            <tr>
+                <th colspan="2">Calculations and Results</th>
+            </tr>
+            <tr>
+                <td>Volume</td>
+                <td>{{ column.volume }} m³</td>
+            </tr>
+            <tr>
+                <td>Total Weight</td>
+                <td>{{ column.total_weight }} kg</td>
+            </tr>
+            <tr>
+                <td>Embodied Carbon</td>
+                <td>{{ column.embodied_carbon }} kg CO₂e</td>
+            </tr>
+            <tr>
+                <td>Transport Factor</td>
+                <td>{{ column.transport_factor }} kg CO₂e</td>
+            </tr>
+            <tr>
+                <td>Waste Factor</td>
+                <td>{{ column.waste_factor }}</td>
+            </tr>
+            <tr>
+                <td>Total Carbon Footprint</td>
+                <td>{{ column.total_carbon }} kg CO₂e</td>
+            </tr>
+            <tr>
+                <td>Efficiency Score</td>
+                <td class="efficiency-score">{{ "%.2f"|format(column.efficiency_score) }}%</td>
+            </tr>
+        </table>
+    </div>
+    {% endfor %}
+</body>
+</html>

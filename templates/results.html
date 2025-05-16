@@ -5,6 +5,21 @@
 {% block content %}
 <div class="container py-4">
     <h2 class="mb-4">Calculation Results</h2>
+    <div class="mb-4">
+        <button id="compareButton" class="btn btn-primary me-2">Compare Columns</button>
+        <button id="exportPdfButton" class="btn btn-success">Export to PDF</button>
+    </div>
+    <div id="comparisonResult" class="mb-4 d-none">
+        <div class="card">
+            <div class="card-header">
+                <h4>Column Comparison</h4>
+            </div>
+            <div class="card-body">
+                <canvas id="comparisonChart"></canvas>
+                <div id="efficiencyScores" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
     <div id="resultsContainer" class="row"></div>
 </div>
 
@@ -41,6 +56,16 @@
             </div>
         </div>
     </div>
+</div>
+<!-- Add Waste Factor Results Section -->
+<div id="wasteResult${index}" class="mt-3 d-none">
+    <h5 class="mb-3">🗑️ Waste Factor Calculation</h5>
+    <ul class="list-group">
+        <li class="list-group-item">Waste Factor: <span class="waste-factor"></span></li>
+        <li class="list-group-item">ECF from Waste: <span class="ecf-waste"></span> kgCO₂e</li>
+        <li class="list-group-item">Total Carbon Footprint: <span class="total-carbon"></span> kgCO₂e</li>
+    </ul>
+    <canvas id="totalChart${index}" class="mt-3"></canvas>
 </div>
 {% endblock %}
 
@@ -293,17 +318,163 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    // Add comparison functionality
+    document.getElementById('compareButton').addEventListener('click', async function() {
+        // Instead of just using sessionStorage, gather all necessary data from the DOM
+        const results = JSON.parse(sessionStorage.getItem('results') || '[]');
+        // Add transport_factor, waste_factor, total_carbon if available
+        results.forEach((col, idx) => {
+            const transportResult = document.getElementById(`transportResult${idx}`);
+            if (transportResult && !transportResult.classList.contains('d-none')) {
+                col.transport_factor = parseFloat(transportResult.querySelector('.transport-factor').textContent) || 0;
+            } else {
+                col.transport_factor = 0;
+            }
+            const wasteResult = document.getElementById(`wasteResult${idx}`);
+            if (wasteResult && !wasteResult.classList.contains('d-none')) {
+                col.waste_factor = parseFloat(wasteResult.querySelector('.waste-factor').textContent) || 0;
+                col.total_carbon = parseFloat(wasteResult.querySelector('.total-carbon').textContent) || (col.embodied_carbon + col.transport_factor);
+            } else {
+                col.waste_factor = 0;
+                col.total_carbon = col.embodied_carbon + col.transport_factor;
+            }
+        });
+        // Calculate efficiency_score for each column
+        const min_carbon = Math.min(...results.map(col => col.total_carbon));
+        results.forEach(col => {
+            col.efficiency_score = (min_carbon / col.total_carbon) * 100;
+        });
+
+        if (results.length < 2) {
+            alert('Please calculate at least 2 column types to compare.');
+            return;
+        }
+    
+        try {
+            const response = await fetch('/concrete/compare', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ columns: results })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                const comparisonDiv = document.getElementById('comparisonResult');
+                comparisonDiv.classList.remove('d-none');
+
+                // Create radar chart
+                const ctx = document.getElementById('comparisonChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Volume', 'Total Weight', 'Embodied Carbon', 'Transport Factor', 'Waste Factor'],
+                        datasets: data.columns.map((col, idx) => ({
+                            label: `Column Type ${idx + 1}`,
+                            data: [
+                                col.volume,
+                                col.total_weight,
+                                col.embodied_carbon,
+                                col.transport_factor,
+                                col.waste_factor
+                            ],
+                            borderColor: idx === data.most_efficient_index ? '#28a745' : 
+                                       idx === data.least_efficient_index ? '#dc3545' : '#17a2b8',
+                            backgroundColor: `rgba(${idx === data.most_efficient_index ? '40, 167, 69' : 
+                                               idx === data.least_efficient_index ? '220, 53, 69' : '23, 162, 184'}, 0.2)`
+                        }))
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Column Type Comparison'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.dataset.label}: ${context.formattedValue}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Display efficiency scores
+                const scoresDiv = document.getElementById('efficiencyScores');
+                scoresDiv.innerHTML = data.columns.map((col, idx) => `
+                    <div class="alert ${idx === data.most_efficient_index ? 'alert-success' : 
+                                      idx === data.least_efficient_index ? 'alert-danger' : 'alert-info'}">
+                        Column Type ${idx + 1}: ${col.efficiency_score.toFixed(2)}% Efficient
+                        ${idx === data.most_efficient_index ? '(Most Efficient)' : 
+                          idx === data.least_efficient_index ? '(Least Efficient)' : ''}
+                    </div>
+                `).join('');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+
+    // Add PDF export functionality
+    document.getElementById('exportPdfButton').addEventListener('click', async function() {
+        const results = JSON.parse(sessionStorage.getItem('results') || '[]');
+        // Add transport_factor, waste_factor, total_carbon if available
+        results.forEach((col, idx) => {
+            const transportResult = document.getElementById(`transportResult${idx}`);
+            if (transportResult && !transportResult.classList.contains('d-none')) {
+                col.transport_factor = parseFloat(transportResult.querySelector('.transport-factor').textContent) || 0;
+            } else {
+                col.transport_factor = 0;
+            }
+            const wasteResult = document.getElementById(`wasteResult${idx}`);
+            if (wasteResult && !wasteResult.classList.contains('d-none')) {
+                col.waste_factor = parseFloat(wasteResult.querySelector('.waste-factor').textContent) || 0;
+                col.total_carbon = parseFloat(wasteResult.querySelector('.total-carbon').textContent) || (col.embodied_carbon + col.transport_factor);
+            } else {
+                col.waste_factor = 0;
+                col.total_carbon = col.embodied_carbon + col.transport_factor;
+            }
+        });
+        // Calculate efficiency_score for each column
+        const min_carbon = Math.min(...results.map(col => col.total_carbon));
+        results.forEach(col => {
+            col.efficiency_score = (min_carbon / col.total_carbon) * 100;
+        });
+
+        if (results.length === 0) {
+            alert('No results to export.');
+            return;
+        }
+
+        try {
+            const response = await fetch('/concrete/export-pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ columns: results })
+            });
+
+            if (response.ok) {
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'ecostruct_report.pdf';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
 });
 </script>
 {% endblock %}
-
-<!-- Add Waste Factor Results Section -->
-<div id="wasteResult${index}" class="mt-3 d-none">
-    <h5 class="mb-3">🗑️ Waste Factor Calculation</h5>
-    <ul class="list-group">
-        <li class="list-group-item">Waste Factor: <span class="waste-factor"></span></li>
-        <li class="list-group-item">ECF from Waste: <span class="ecf-waste"></span> kgCO₂e</li>
-        <li class="list-group-item">Total Carbon Footprint: <span class="total-carbon"></span> kgCO₂e</li>
-    </ul>
-    <canvas id="totalChart${index}" class="mt-3"></canvas>
-</div>
