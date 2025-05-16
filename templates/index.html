@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-4 mb-4 animate__animated animate__fadeIn">EcoStruct</h1>
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <a href="/concrete" class="btn btn-success btn-lg mb-3 w-100">Concrete</a>
+            <button class="btn btn-secondary btn-lg mb-3 w-100" disabled data-bs-toggle="tooltip" title="Coming Soon">Wood</button>
+            <button class="btn btn-secondary btn-lg mb-3 w-100" disabled data-bs-toggle="tooltip" title="Coming Soon">Steel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

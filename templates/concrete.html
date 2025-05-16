@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}Concrete Elements{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h2 class="mb-4">Select Structural Element</h2>
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <a href="/concrete/column" class="btn btn-success btn-lg mb-3 w-100">Column</a>
+            <button class="btn btn-secondary btn-lg mb-3 w-100" disabled data-bs-toggle="tooltip" title="Coming Soon">Beam</button>
+            <button class="btn btn-secondary btn-lg mb-3 w-100" disabled data-bs-toggle="tooltip" title="Coming Soon">Shear Wall</button>
+            <button class="btn btn-secondary btn-lg mb-3 w-100" disabled data-bs-toggle="tooltip" title="Coming Soon">Slab</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

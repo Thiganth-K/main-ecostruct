@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Results{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">Calculation Results</h2>
+    <div id="resultsContainer" class="row"></div>
+</div>
+
+<!-- Transport Factor Modal -->
+<div class="modal fade" id="transportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Calculate Transport Factor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="transportForm">
+                    <input type="hidden" id="columnIndex">
+                    <input type="hidden" id="totalWeight">
+                    <div class="mb-3">
+                        <label class="form-label">Type of Vehicle</label>
+                        <select class="form-select" id="vehicleType" required>
+                            <option value="HGV">HGV (7.5 ton – 17 ton)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Distance (km)</label>
+                        <input type="number" class="form-control" id="distance" required min="0.1" step="0.1">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type of Fuel</label>
+                        <select class="form-select" id="fuelType" required>
+                            <option value="Petrol">Petrol</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Calculate</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const results = JSON.parse(sessionStorage.getItem('results') || '[]');
+    const container = document.getElementById('resultsContainer');
+    const transportModal = new bootstrap.Modal(document.getElementById('transportModal'));
+
+    results.forEach((result, index) => {
+        const card = document.createElement('div');
+        card.className = 'col-md-6 mb-4';
+        card.innerHTML = `
+            <div class="card">
+                <div class="card-header">
+                    <h4>Column Type ${index + 1}</h4>
+                </div>
+                <div class="card-body">
+                    <canvas id="chart${index}" class="mb-3"></canvas>
+                    <ul class="list-group">
+                        <li class="list-group-item">Volume: ${result.volume} m³</li>
+                        <li class="list-group-item">Cement Quantity: ${result.cement_qty} kg</li>
+                        <li class="list-group-item">Fine Aggregate: ${result.fine_qty} kg</li>
+                        <li class="list-group-item">Coarse Aggregate: ${result.coarse_qty} kg</li>
+                        <li class="list-group-item">Steel Mass: ${result.steel_mass} kg</li>
+                        <li class="list-group-item">Total Weight: ${result.total_weight} kg</li>
+                        <li class="list-group-item">ECF: ${result.ecf}</li>
+                        <li class="list-group-item">Embodied Carbon: ${result.embodied_carbon} kg CO₂e</li>
+                    </ul>
+                    <!-- Add Waste Factor Button to transportResult div -->
+                    <div id="transportResult${index}" class="mt-3 d-none">
+                        <h5 class="mb-3">🚚 Transport Factor Calculation</h5>
+                        <ul class="list-group">
+                            <li class="list-group-item">Vehicle Type: <span class="vehicle-type"></span></li>
+                            <li class="list-group-item">Distance: <span class="distance"></span> km</li>
+                            <li class="list-group-item">Fuel: <span class="fuel-type"></span></li>
+                            <li class="list-group-item">Transport Factor: <span class="transport-factor"></span> kgCO₂e</li>
+                            <li class="list-group-item">Total Carbon Footprint: <span class="total-carbon"></span> kgCO₂e</li>
+                        </ul>
+                        <button class="btn btn-warning mt-3 calculate-waste" data-index="${index}" 
+                                data-weight="${result.total_weight}" 
+                                data-grade="${result.grade}" 
+                                data-spec="${result.specification}"
+                                data-embodied="${result.embodied_carbon}"
+                                disabled>
+                            ➕ Calculate Waste Factor
+                        </button>
+                        <div id="wasteResult${index}" class="mt-3 d-none">
+                            <h5 class="mb-3">🗑️ Waste Factor Calculation</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item">Waste Factor: <span class="waste-factor"></span></li>
+                                <li class="list-group-item">ECF from Waste: <span class="ecf-waste"></span> kgCO₂e</li>
+                                <li class="list-group-item">Total Carbon Footprint: <span class="total-carbon"></span> kgCO₂e</li>
+                            </ul>
+                            <canvas id="totalChart${index}" class="mt-3"></canvas>
+                        </div>
+                    </div>
+                    <button class="btn btn-success mt-3 calculate-transport" data-index="${index}" data-weight="${result.total_weight}">
+                        ➕ Calculate Transport Factor
+                    </button>
+                </div>
+            </div>
+        `;
+        container.appendChild(card);
+
+        // Create material distribution chart
+        const ctx = document.getElementById(`chart${index}`).getContext('2d');
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Cement', 'Fine Aggregate', 'Coarse Aggregate', 'Steel'],
+                datasets: [{
+                    data: [
+                        result.cement_qty,
+                        result.fine_qty,
+                        result.coarse_qty,
+                        result.steel_mass
+                    ],
+                    backgroundColor: [
+                        '#FF6384',
+                        '#36A2EB',
+                        '#FFCE56',
+                        '#4BC0C0'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Material Distribution'
+                    }
+                }
+            }
+        });
+    });
+
+    // Handle transport calculation button clicks
+    document.querySelectorAll('.calculate-transport').forEach(button => {
+        button.addEventListener('click', function() {
+            document.getElementById('columnIndex').value = this.dataset.index;
+            document.getElementById('totalWeight').value = this.dataset.weight;
+            transportModal.show();
+        });
+    });
+
+    // Handle transport calculation form submission
+    document.getElementById('transportForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const index = document.getElementById('columnIndex').value;
+        const data = {
+            total_weight: parseFloat(document.getElementById('totalWeight').value),
+            vehicle_type: document.getElementById('vehicleType').value,
+            distance: parseFloat(document.getElementById('distance').value),
+            fuel_type: document.getElementById('fuelType').value
+        };
+
+        try {
+            const response = await fetch('/concrete/calculate-transport', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                const transportResult = document.getElementById(`transportResult${index}`);
+                transportResult.classList.remove('d-none');
+                
+                transportResult.querySelector('.vehicle-type').textContent = result.vehicle_type;
+                transportResult.querySelector('.distance').textContent = result.distance;
+                transportResult.querySelector('.fuel-type').textContent = result.fuel_type;
+                transportResult.querySelector('.transport-factor').textContent = result.transport_factor;
+                
+                const totalCarbon = (results[index].embodied_carbon + result.transport_factor).toFixed(2);
+                transportResult.querySelector('.total-carbon').textContent = totalCarbon;
+                
+                // Create or update the carbon footprint chart
+                const carbonCtx = document.createElement('canvas');
+                carbonCtx.id = `carbonChart${index}`;
+                transportResult.appendChild(carbonCtx);
+                
+                new Chart(carbonCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Embodied Carbon', 'Transport Factor', 'Total'],
+                        datasets: [{
+                            data: [
+                                results[index].embodied_carbon,
+                                result.transport_factor,
+                                parseFloat(totalCarbon)
+                            ],
+                            backgroundColor: [
+                                '#28a745',
+                                '#ffc107',
+                                '#17a2b8'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Carbon Footprint Breakdown'
+                            }
+                        }
+                    }
+                });
+                
+                // Enable the waste factor button after transport calculation
+                transportResult.querySelector('.calculate-waste').disabled = false;
+                
+                transportModal.hide();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    });
+
+    // Add event listeners for waste factor calculation buttons
+    document.addEventListener('click', async function(e) {
+        if (e.target.classList.contains('calculate-waste')) {
+            const index = e.target.dataset.index;
+            const data = {
+                total_weight: parseFloat(e.target.dataset.weight),
+                grade: e.target.dataset.grade,
+                specification: e.target.dataset.spec,
+                transport_factor: parseFloat(document.querySelector(`#transportResult${index} .transport-factor`).textContent),
+                embodied_carbon: parseFloat(e.target.dataset.embodied)
+            };
+
+            try {
+                const response = await fetch('/concrete/calculate-waste', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    const wasteResult = document.getElementById(`wasteResult${index}`);
+                    wasteResult.classList.remove('d-none');
+                    
+                    wasteResult.querySelector('.waste-factor').textContent = result.waste_factor;
+                    wasteResult.querySelector('.ecf-waste').textContent = result.ecf_from_waste;
+                    wasteResult.querySelector('.total-carbon').textContent = result.total_carbon;
+                    
+                    // Create total carbon footprint breakdown chart
+                    const totalCtx = document.getElementById(`totalChart${index}`);
+                    new Chart(totalCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: ['Embodied Carbon', 'Transport Factor', 'Waste Factor', 'Total'],
+                            datasets: [{
+                                data: [
+                                    parseFloat(data.embodied_carbon),
+                                    parseFloat(data.transport_factor),
+                                    result.ecf_from_waste,
+                                    result.total_carbon
+                                ],
+                                backgroundColor: [
+                                    '#28a745',
+                                    '#ffc107',
+                                    '#dc3545',
+                                    '#17a2b8'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Total Carbon Footprint Breakdown'
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
+
+<!-- Add Waste Factor Results Section -->
+<div id="wasteResult${index}" class="mt-3 d-none">
+    <h5 class="mb-3">🗑️ Waste Factor Calculation</h5>
+    <ul class="list-group">
+        <li class="list-group-item">Waste Factor: <span class="waste-factor"></span></li>
+        <li class="list-group-item">ECF from Waste: <span class="ecf-waste"></span> kgCO₂e</li>
+        <li class="list-group-item">Total Carbon Footprint: <span class="total-carbon"></span> kgCO₂e</li>
+    </ul>
+    <canvas id="totalChart${index}" class="mt-3"></canvas>
+</div>
