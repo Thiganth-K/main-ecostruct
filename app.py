@@ -20,6 +20,42 @@ def concrete():
 def column():
     return render_template('column.html')
 
+def calculate_costs(cement_qty, fine_qty, coarse_qty, steel_mass, spec, grade):
+    cement_cost = 0
+    if spec == "15% Fly Ash":
+        cement_cost = (0.85 * cement_qty) * 8 + (0.15 * cement_qty) * 2.9
+    elif spec == "30% Fly Ash":
+        cement_cost = (0.70 * cement_qty) * 8 + (0.30 * cement_qty) * 2.9
+    elif spec == "40% Fly Ash":
+        cement_cost = (0.60 * cement_qty) * 8 + (0.40 * cement_qty) * 2.9
+    elif spec == "Portland Limestone – 14%":
+        cement_cost = (0.86 * cement_qty) * 8 + (0.14 * cement_qty) * 6
+    elif spec == "35% Natural Pozzolanic Ash":
+        cement_cost = (0.65 * cement_qty) * 8 + (0.35 * cement_qty) * 5.4
+    elif spec == "25% Blast Furnace Slag":
+        cement_cost = (0.75 * cement_qty) * 8 + (0.25 * cement_qty) * 4
+    elif spec == "50% Blast Furnace Slag":
+        cement_cost = (0.50 * cement_qty) * 8 + (0.50 * cement_qty) * 4
+    elif spec == "70% Blast Furnace Slag":
+        cement_cost = (0.70 * cement_qty) * 8 + (0.30 * cement_qty) * 4
+    elif spec == "Other":
+        cement_cost = cement_qty * 8
+    else:
+        cement_cost = cement_qty * 8  # Default
+
+    fine_agg_cost = fine_qty * 1.4
+    coarse_agg_cost = coarse_qty * 1.4
+    steel_cost = steel_mass * 66
+    total_cost = cement_cost + fine_agg_cost + coarse_agg_cost + steel_cost
+
+    return {
+        "cement_cost": round(cement_cost, 2),
+        "fine_agg_cost": round(fine_agg_cost, 2),
+        "coarse_agg_cost": round(coarse_agg_cost, 2),
+        "steel_cost": round(steel_cost, 2),
+        "total_cost": round(total_cost, 2)
+    }
+
 @app.route('/concrete/calculate', methods=['POST'])
 def calculate():
     data = request.get_json()
@@ -53,6 +89,9 @@ def calculate():
         total_weight = concrete_weight + steel_mass
         ecf = resolve_ecf(grade, spec)
         embodied_carbon = total_weight * ecf
+
+        # Cost calculation
+        costs = calculate_costs(cement_qty, fine_qty, coarse_qty, steel_mass, spec, grade)
         
         results.append({
             'volume': round(volume, 2),
@@ -62,7 +101,15 @@ def calculate():
             'steel_mass': round(steel_mass, 2),
             'total_weight': round(total_weight, 2),
             'ecf': round(ecf, 3),
-            'embodied_carbon': round(embodied_carbon, 2)
+            'embodied_carbon': round(embodied_carbon, 2),
+            'grade': grade,
+            'specification': spec,
+            # Add cost fields
+            'cement_cost': costs['cement_cost'],
+            'fine_agg_cost': costs['fine_agg_cost'],
+            'coarse_agg_cost': costs['coarse_agg_cost'],
+            'steel_cost': costs['steel_cost'],
+            'total_cost': costs['total_cost']
         })
     
     return jsonify({'results': results})
@@ -129,11 +176,16 @@ def compare_columns():
 @app.route('/concrete/export-pdf', methods=['POST'])
 def export_pdf():
     data = request.get_json()
-    
+    columns = data['columns']
+
+    # Calculate total cost on the backend to ensure accuracy
+    total_cost = sum(col.get('total_cost', 0) for col in columns)
+
     # Generate HTML content
     html_content = render_template(
         'pdf_template.html',
-        columns=data['columns'],
+        columns=columns,
+        total_cost=total_cost,
         date=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     )
     

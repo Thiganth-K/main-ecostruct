@@ -25,6 +25,10 @@
         <p>Generated on {{ date }}</p>
     </div>
 
+    <div style="margin-bottom: 30px; text-align: center;">
+        <h2 style="color: #28a745;">Total Cost of All Columns: ₹{{ "{:,.2f}".format(total_cost) }}</h2>
+    </div>
+
     {% for column in columns %}
     <div class="column-section">
         <h2>Column Type {{ loop.index }}</h2>
@@ -81,6 +85,26 @@
             <tr>
                 <td>Efficiency Score</td>
                 <td class="efficiency-score">{{ "%.2f"|format(column.efficiency_score) }}%</td>
+            </tr>
+            <tr>
+                <td>Cement Cost</td>
+                <td>₹{{ column.cement_cost }}</td>
+            </tr>
+            <tr>
+                <td>Fine Aggregate Cost</td>
+                <td>₹{{ column.fine_agg_cost }}</td>
+            </tr>
+            <tr>
+                <td>Coarse Aggregate Cost</td>
+                <td>₹{{ column.coarse_agg_cost }}</td>
+            </tr>
+            <tr>
+                <td>Steel Cost</td>
+                <td>₹{{ column.steel_cost }}</td>
+            </tr>
+            <tr>
+                <td><b>Total Cost</b></td>
+                <td><b>₹{{ column.total_cost }}</b></td>
             </tr>
         </table>
     </div>

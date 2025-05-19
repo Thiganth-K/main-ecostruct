@@ -5,6 +5,7 @@
 {% block content %}
 <div class="container py-4">
     <h2 class="mb-4">Calculation Results</h2>
+    <div id="totalCostContainer" class="alert alert-info fw-bold fs-5 mb-4"></div>
     <div class="mb-4">
         <button id="compareButton" class="btn btn-primary me-2">Compare Columns</button>
         <button id="exportPdfButton" class="btn btn-success">Export to PDF</button>
@@ -76,6 +77,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.getElementById('resultsContainer');
     const transportModal = new bootstrap.Modal(document.getElementById('transportModal'));
 
+    // Calculate and display total cost
+    const totalCost = results.reduce((sum, col) => sum + (col.total_cost || 0), 0);
+    document.getElementById('totalCostContainer').textContent = 
+        `Total Cost of All Columns: ₹${totalCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
     results.forEach((result, index) => {
         const card = document.createElement('div');
         card.className = 'col-md-6 mb-4';
@@ -95,6 +101,12 @@ document.addEventListener('DOMContentLoaded', function() {
                         <li class="list-group-item">Total Weight: ${result.total_weight} kg</li>
                         <li class="list-group-item">ECF: ${result.ecf}</li>
                         <li class="list-group-item">Embodied Carbon: ${result.embodied_carbon} kg CO₂e</li>
+                        <!-- Add cost fields below -->
+                        <li class="list-group-item">Cement Cost: ₹${result.cement_cost}</li>
+                        <li class="list-group-item">Fine Aggregate Cost: ₹${result.fine_agg_cost}</li>
+                        <li class="list-group-item">Coarse Aggregate Cost: ₹${result.coarse_agg_cost}</li>
+                        <li class="list-group-item">Steel Cost: ₹${result.steel_cost}</li>
+                        <li class="list-group-item fw-bold">Total Cost: ₹${result.total_cost}</li>
                     </ul>
                     <!-- Add Waste Factor Button to transportResult div -->
                     <div id="transportResult${index}" class="mt-3 d-none">
